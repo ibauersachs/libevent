@@ -19,7 +19,7 @@
 #       start libevent.sln
 #
 
-cmake_minimum_required(VERSION 3.1.2 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.4 FATAL_ERROR)
 
 if (POLICY CMP0054)
     cmake_policy(SET CMP0054 NEW)
@@ -569,10 +569,7 @@ if (NOT EVENT__DISABLE_THREAD_SUPPORT)
         endif()
 
         set(EVENT__HAVE_PTHREADS 1)
-        list(APPEND LIB_APPS ${CMAKE_THREAD_LIBS_INIT})
-
-        # for CHECK_SYMBOLS_EXIST()
-        list(APPEND CMAKE_REQUIRED_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
+        list(APPEND LIB_APPS Threads::Threads)
 
         CHECK_TYPE_SIZE(pthread_t EVENT__SIZEOF_PTHREAD_T)
         list(APPEND SYMBOLS_TO_CHECK pthread_mutexattr_setprotocol)
@@ -937,30 +934,28 @@ if (NOT EVENT__DISABLE_OPENSSL)
     find_package(OpenSSL REQUIRED)
 
     set(EVENT__HAVE_OPENSSL 1)
+    set(OPENSSL_TARGETS OpenSSL::SSL)
 
     message(STATUS "OpenSSL include: ${OPENSSL_INCLUDE_DIR}")
     message(STATUS "OpenSSL lib: ${OPENSSL_LIBRARIES}")
 
-    include_directories(${OPENSSL_INCLUDE_DIR})
-
     list(APPEND SRC_OPENSSL bufferevent_openssl.c bufferevent_ssl.c)
     list(APPEND HDR_PUBLIC include/event2/bufferevent_ssl.h)
-    list(APPEND LIB_APPS ${OPENSSL_LIBRARIES})
+    list(APPEND LIB_APPS ${OPENSSL_TARGETS})
 endif()
 
 if (NOT EVENT__DISABLE_MBEDTLS)
     find_package(MbedTLS REQUIRED)
 
     set(EVENT__HAVE_MBEDTLS 1)
+    set(MBEDTLS_TARGETS MbedTLS::mbedtls MbedTLS::mbedcrypto MbedTLS::mbedx509)
 
     message(STATUS "mbed TLS include: ${MBEDTLS_INCLUDE_DIR}")
     message(STATUS "mbed TLS lib: ${MBEDTLS_LIBRARIES}")
 
-    include_directories(${MBEDTLS_INCLUDE_DIR})
-
     list(APPEND SRC_MBEDTLS bufferevent_mbedtls.c bufferevent_ssl.c)
     list(APPEND HDR_PUBLIC include/event2/bufferevent_ssl.h)
-    list(APPEND LIB_APPS ${MBEDTLS_LIBRARIES})
+    list(APPEND LIB_APPS ${MBEDTLS_TARGETS})
 endif()
 
 if (NOT EVENT__DISABLE_TESTS)
@@ -968,10 +963,8 @@ if (NOT EVENT__DISABLE_TESTS)
     find_package(ZLIB)
 
     if (ZLIB_LIBRARY AND ZLIB_INCLUDE_DIR)
-        include_directories(${ZLIB_INCLUDE_DIRS})
-
         set(EVENT__HAVE_LIBZ 1)
-        list(APPEND LIB_APPS ${ZLIB_LIBRARIES})
+        list(APPEND LIB_APPS ZLIB::ZLIB)
     endif()
 endif()
 
@@ -983,7 +976,7 @@ set(SRC_EXTRA
     sha1.c
     evrpc.c)
 
-if("${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}" LESS 3.20)
+if(${CMAKE_VERSION} VERSION_LESS "3.20")
   include(TestBigEndian)
   TEST_BIG_ENDIAN(IS_BIG_ENDIAN)
   if(IS_BIG_ENDIAN)
@@ -1061,16 +1054,14 @@ add_event_library(event_extra
 if (NOT EVENT__DISABLE_OPENSSL)
     add_event_library(event_openssl
         INNER_LIBRARIES event_core
-        OUTER_INCLUDES ${OPENSSL_INCLUDE_DIR}
-        LIBRARIES ${OPENSSL_LIBRARIES}
+        LIBRARIES ${OPENSSL_TARGETS}
         SOURCES ${SRC_OPENSSL})
 endif()
 
 if (NOT EVENT__DISABLE_MBEDTLS)
     add_event_library(event_mbedtls
         INNER_LIBRARIES event_core
-        OUTER_INCLUDES ${MBEDTLS_INCLUDE_DIR}
-        LIBRARIES ${MBEDTLS_LIBRARIES}
+        LIBRARIES ${MBEDTLS_TARGETS}
         SOURCES ${SRC_MBEDTLS})
 endif()
 
@@ -1078,6 +1069,7 @@ if (EVENT__HAVE_PTHREADS)
     set(SRC_PTHREADS evthread_pthread.c)
     add_event_library(event_pthreads
         INNER_LIBRARIES event_core
+        LIBRARIES Threads::Threads
         SOURCES ${SRC_PTHREADS})
 endif()
 
